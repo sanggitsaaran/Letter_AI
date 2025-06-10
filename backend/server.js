@@ -5,6 +5,7 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
 const axios = require("axios");
+const { nanoid } = require("nanoid");
 
 const app = express();
 const server = http.createServer(app);
@@ -43,8 +44,53 @@ app.post("/analyze", async (req, res) => { // <-- ADD async
   }
 });
 
+// GET all letters (just ID and title)
+app.get("/letters", async (req, res) => {
+  try {
+    const letters = await Letter.find({}, 'title createdAt').sort({ createdAt: -1 });
+    res.json(letters);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch letters" });
+  }
+});
+
+// GET a single letter's content
+app.get("/letters/:id", async (req, res) => {
+  try {
+    const letter = await Letter.findById(req.params.id);
+    if (!letter) return res.status(404).json({ error: "Letter not found" });
+    res.json(letter);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch letter" });
+  }
+});
+
+// POST a new letter
+app.post("/letters", async (req, res) => {
+  try {
+    const newLetter = new Letter({
+      title: "New Letter",
+      text: "Start writing..."
+    });
+    await newLetter.save();
+    res.status(201).json(newLetter);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create new letter" });
+  }
+});
+
+// DELETE a letter
+app.delete("/letters/:id", async (req, res) => {
+  try {
+    const result = await Letter.findByIdAndDelete(req.params.id);
+    if (!result) return res.status(404).json({ error: "Letter not found" });
+    res.status(200).json({ message: "Letter deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete letter" });
+  }
+});
+
 // MongoDB Connection
-const MONGO_URI = "mongodb+srv://letterai_user:dXrlpN4Cem3duAuE@letteraicluster.mwd6s.mongodb.net/?retryWrites=true&w=majority&appName=LetterAIClusterx";
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -53,8 +99,10 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Schema for storing writing progress
 const letterSchema = new mongoose.Schema({
-  userId: String, // Later useful for authentication
+  _id: { type: String, default: () => nanoid(10) }, // e.g., 'abc123xyz'
+  title: { type: String, default: "Untitled Letter" },
   text: String,
+  createdAt: { type: Date, default: Date.now }
 });
 const Letter = mongoose.model("Letter", letterSchema);
 
@@ -62,16 +110,16 @@ const Letter = mongoose.model("Letter", letterSchema);
 io.on("connection", (socket) => {
   console.log("A user connected: " + socket.id);
 
-  // Load previous writing session
-  socket.on("loadText", async () => {
-    const savedText = await Letter.findOne();
-    socket.emit("loadText", savedText ? savedText.text : "");
-  });
-
   // Save text to MongoDB
-  socket.on("saveText", async (text) => {
-    await Letter.findOneAndUpdate({}, { text }, { upsert: true });
-    console.log("Text saved to MongoDB:", text);
+  socket.on("saveText", async ({id, text}) => {
+    if (!id) return;
+    try {
+      await Letter.findByIdAndUpdate(id, { text });
+      // We don't need to log every save event anymore, it's too noisy.
+      // console.log(`Text saved for letter ${id}`);
+    } catch(error) {
+      console.error(`Failed to save text for letter ${id}:`, error);
+    }
   });
 
   socket.on("disconnect", () => {
