@@ -1,9 +1,10 @@
+require('dotenv').config();
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
-const { spawn } = require("child_process");
+const axios = require("axios");
 
 const app = express();
 const server = http.createServer(app);
@@ -17,45 +18,34 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-app.post("/analyze", (req, res) => {
+app.post("/analyze", async (req, res) => { // <-- ADD async
   const userInput = req.body.text;
 
   if (!userInput) {
     return res.status(400).json({ error: "Text input is required" });
   }
-  const pythonProcess = spawn("python", ["ai_model.py", userInput]);
+  
+  try {
+    // Call our new Python API service
+    const pythonApiResponse = await axios.post("http://127.0.0.1:8000/analyze", {
+      text: userInput,
+    });
 
-  let output = "";
-  let errorOutput = "";
+    // Send the feedback from the Python API back to the frontend
+    res.json({ feedback: pythonApiResponse.data.feedback });
 
-  pythonProcess.stdout.on("data", (data) => {
-    output += data.toString();
-  });
-
-  pythonProcess.stderr.on("data", (data) => {
-    errorOutput += data.toString();
-    console.error(`Python error: ${data.toString()}`);
-  });
-
-  pythonProcess.on("close", (code) => {
-    if (code !== 0) {
-      return res.status(500).json({ error: `Python script exited with code ${code}`, details: errorOutput });
-    }
-    res.json({ feedback: output.trim() });
-  });
-
-  // pythonProcess.stdout.on("data", (data) => {
-  //   res.json({ feedback: data.toString().trim() });
-  // });
-
-  // pythonProcess.stderr.on("data", (data) => {
-  //   console.error(`Error: ${data}`);
-  // });
+  } catch (error) {
+    console.error("Error calling Python API:", error.message);
+    res.status(500).json({ 
+        error: "Failed to get feedback from AI service.",
+        details: error.message 
+    });
+  }
 });
 
 // MongoDB Connection
 const MONGO_URI = "mongodb+srv://letterai_user:dXrlpN4Cem3duAuE@letteraicluster.mwd6s.mongodb.net/?retryWrites=true&w=majority&appName=LetterAIClusterx";
-mongoose.connect(MONGO_URI, {
+mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log("Connected to MongoDB 🚀"))
@@ -89,5 +79,5 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
