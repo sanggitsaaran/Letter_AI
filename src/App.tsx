@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
 
-// Define the shape of a Letter object
 interface Letter {
   _id: string;
   title: string;
@@ -9,127 +8,182 @@ interface Letter {
   createdAt: string;
 }
 
+// The socket connection needs the full URL, as it's not a standard HTTP request
 const socket = io("http://localhost:5000");
+const LOCAL_STORAGE_KEY = "letter-ai-active-id";
 
 export default function App() {
-  // State for the list of all letters in the sidebar
   const [letters, setLetters] = useState<Letter[]>([]);
-  // State for the currently selected letter's ID
-  const [activeLetterId, setActiveLetterId] = useState<string | null>(null);
-  // State for the text in the editor
+  const [activeLetterId, setActiveLetterId] = useState<string | null>(() => {
+    return localStorage.getItem(LOCAL_STORAGE_KEY);
+  });
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestion, setSuggestion] = useState("");
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchLetters = useCallback(async () => {
-    const response = await fetch("http://localhost:5000/letters");
-    const data = await response.json();
-    setLetters(data);
-    // If there's no active letter, select the first one
-    if (!activeLetterId && data.length > 0) {
-      setActiveLetterId(data[0]._id);
+    try {
+      const response = await fetch("/letters");
+      const data = await response.json();
+      setLetters(data);
+    } catch (error) {
+      console.error("Failed to fetch letters list:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLetters();
+  }, [fetchLetters]); // Run only once on mount
+
+  useEffect(() => {
+    if (letters.length > 0) {
+      const activeLetterExists = letters.some(l => l._id === activeLetterId);
+      if (!activeLetterExists) {
+        // If the active ID is invalid (e.g., deleted), select the first letter in the list.
+        setActiveLetterId(letters[0]._id);
+      }
+    } else {
+      // If there are no letters, ensure nothing is selected.
+      setActiveLetterId(null);
+    }
+  }, [letters, activeLetterId]);
+
+  useEffect(() => {
+    const fetchLetterContent = async () => {
+      if (!activeLetterId) {
+        setText("");
+        setFeedback("");
+        return;
+      }
+      try {
+        // Use the proxy
+        const response = await fetch(`/letters/${activeLetterId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch letter. Status: ${response.status}`);
+        }
+        const data: Letter = await response.json();
+        setText(data.text);
+        setFeedback("");
+      } catch (error) {
+        console.error("Could not load letter content:", error); // Refresh list in case the letter was deleted
+        setText(""); // Set text to a safe, empty state
+        setFeedback(""); // Also clear feedback
+      }
+    };
+    fetchLetterContent();
+  }, [activeLetterId]);
+
+  useEffect(() => {
+    if (activeLetterId) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, activeLetterId);
+    } else {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   }, [activeLetterId]);
 
   useEffect(() => {
-    fetchLetters();
-  }, [fetchLetters]);
-
-  useEffect(() => {
-  // When the activeLetterId changes, fetch its full content
-  const fetchLetterContent = async () => {
-    if (!activeLetterId) {
-      // If no letter is selected, clear the editor.
-      setText("");
+    setSuggestion("");
+    if (text === null || text.trim() === "" || text.startsWith("Error:")) {
       setFeedback("");
       return;
     }
-
-    try {
-      const response = await fetch(`http://localhost:5000/letters/${activeLetterId}`);
-      
-      // NEW: Check if the response was successful (e.g., not a 404 or 500)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch letter. Status: ${response.status}`);
-      }
-
-      const data: Letter = await response.json();
-      setText(data.text);
-      setFeedback(""); // Clear feedback when switching letters
-
-    } catch (error) {
-      console.error("Could not load letter content:", error);
-      // This handles the error case, preventing a crash.
-      setText("Error: Could not load this letter.");
-      // Optional: You could also try to refresh the letter list here.
-      // fetchLetters(); 
-    }
-  };
-
-  fetchLetterContent();
-}, [activeLetterId]);
-
-  // Debouncing for AI feedback (this logic remains the same)
-  useEffect(() => {
-    if (text.trim() === "" || text.startsWith("Error:")) {
-      setFeedback("");
-      return;
-    }
-    const handler = setTimeout(() => getAIFeedback(text), 800);
-    return () => clearTimeout(handler);
+    const feedbackHandler = setTimeout(() => getAIFeedback(text), 1500);
+    const predictionHandler = setTimeout(() => getAIPrediction(text), 300);
+    return () => {
+      clearTimeout(feedbackHandler);
+      clearTimeout(predictionHandler);
+    };
   }, [text]);
 
-  const handleCreateNewLetter = async () => {
-    const response = await fetch("http://localhost:5000/letters", { method: "POST" });
-    const newLetter: Letter = await response.json();
-    setLetters([newLetter, ...letters]); // Add to top of the list
-    setActiveLetterId(newLetter._id); // Make it active
-  };
-  
-  const handleDeleteLetter = async (idToDelete: string) => {
-    await fetch(`http://localhost:5000/letters/${idToDelete}`, { method: "DELETE" });
-    // Refetch the list to update the UI
-    fetchLetters();
-    // If we deleted the active letter, we need to select another one
-    if(activeLetterId === idToDelete) {
-      setActiveLetterId(null);
-    }
-  };
-
-  const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newText = e.target.value;
-    setText(newText);
-    socket.emit("saveText", { id: activeLetterId, text: newText });
-  };
-
   const getAIFeedback = async (currentText: string) => {
-    setIsLoading(true); // Show the loading indicator
-    setFeedback(""); // Clear old feedback
-
+    setIsLoading(true);
+    setFeedback("");
     try {
-      const response = await fetch("http://localhost:5000/analyze", {
+      // Use the proxy
+      const response = await fetch("/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: currentText }),
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to get feedback from server");
-      }
-
+      if (!response.ok) throw new Error("Server error on feedback");
       const data = await response.json();
       setFeedback(data.feedback);
     } catch (error) {
       console.error("Error fetching AI feedback:", error);
       setFeedback("Sorry, an error occurred while getting feedback.");
     } finally {
-      setIsLoading(false); // Hide the loading indicator
+      setIsLoading(false);
+    }
+  };
+
+  const getAIPrediction = async (currentText: string) => {
+    if (currentText.endsWith(" ")) return;
+    try {
+      // Use the proxy
+      const response = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: currentText }),
+      });
+      if (!response.ok) throw new Error("Server error on prediction");
+      const data = await response.json();
+      if (data.prediction) {
+        setSuggestion(data.prediction);
+      }
+    } catch (error) {
+      console.error("Prediction failed:", error);
+    }
+  };
+  
+  const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newText = e.target.value;
+    setText(newText);
+    socket.emit("saveText", { id: activeLetterId, text: newText });
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (suggestion && (e.key === "Tab" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      const newText = text + suggestion;
+      setText(newText);
+      setSuggestion("");
+    }
+  };
+
+  const handleCreateNewLetter = async () => {
+    try {
+      const response = await fetch("/letters", { method: "POST" });
+      const newLetter: Letter = await response.json();
+      // Prepend to the list and set as active immediately
+      setLetters([newLetter, ...letters]);
+      setActiveLetterId(newLetter._id);
+    } catch (error) {
+      console.error("Failed to create new letter:", error);
+    }
+  };
+
+  const handleDeleteLetter = async (idToDelete: string) => {
+    const newLetters = letters.filter(l => l._id !== idToDelete);
+    setLetters(newLetters);
+
+    if (activeLetterId === idToDelete) {
+        const nextActiveId = newLetters.length > 0 ? newLetters[0]._id : null;
+        setActiveLetterId(nextActiveId);
+    }
+
+    try {
+      await fetch(`/letters/${idToDelete}`, { method: "DELETE" });
+      // Simply refetch the list. The useEffects will handle the rest.
+    } catch (error) {
+      console.error("Failed to delete letter:", error);
+      fetchLetters();
     }
   };
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
-      {/* Sidebar */}
       <div className="w-1/4 bg-white border-r border-gray-200 p-4 flex flex-col">
         <h1 className="text-xl font-bold text-blue-600 mb-4">My Letters</h1>
         <button
@@ -148,38 +202,55 @@ export default function App() {
               }`}
             >
               <span className="font-medium truncate">{letter.title}</span>
-               <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteLetter(letter._id); }}
-                  className="text-red-400 hover:text-red-600 text-xs"
-                >
-                  DELETE
-                </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteLetter(letter._id);
+                }}
+                className="text-red-400 hover:text-red-600 text-xs font-bold"
+              >
+                DELETE
+              </button>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="w-3/4 p-8 flex flex-col">
         {activeLetterId ? (
           <>
-            <textarea
-              className="w-full flex-grow p-4 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Start writing..."
-              value={text}
-              onChange={handleTyping}
-            />
+            <div className="relative w-full flex-grow">
+              <div
+                className="absolute inset-0 p-4 font-mono text-lg text-gray-400 pointer-events-none whitespace-pre-wrap break-words"
+              >
+                {text}
+                <span className="opacity-75">{suggestion}</span>
+              </div>
+              <textarea
+                ref={textAreaRef}
+                className="absolute inset-0 w-full h-full p-4 bg-transparent border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-lg text-gray-800 caret-black"
+                placeholder="Start writing..."
+                value={text}
+                onChange={handleTyping}
+                onKeyDown={handleKeyDown}
+              />
+            </div>
+
             <div className="mt-4 p-4 h-48 bg-white rounded-md border border-gray-200 overflow-y-auto">
               {isLoading ? (
                 <p className="text-lg text-gray-500">AI is thinking...</p>
               ) : (
-                <p className="text-lg text-green-700 whitespace-pre-wrap">{feedback}</p>
+                <p className="text-lg text-green-700 whitespace-pre-wrap">
+                  {feedback}
+                </p>
               )}
             </div>
           </>
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-xl text-gray-500">Select a letter or create a new one to begin.</p>
+            <p className="text-xl text-gray-500">
+              Select a letter or create a new one to begin.
+            </p>
           </div>
         )}
       </main>

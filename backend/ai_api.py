@@ -1,5 +1,3 @@
-# FILE: backend/ai_api.py
-
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, BitsAndBytesConfig
 from fastapi import FastAPI
@@ -48,7 +46,8 @@ async def analyze_text(data: TextInput):
     and returns the feedback.
     """
     user_input = data.text
-
+    if not user_input or not user_input.strip():
+        return {"feedback": ""} # Return empty feedback if input is empty
     # Improved prompt for better, more structured feedback
     prompt = f"""<|system|>
 You are an expert writing assistant. Your task is to analyze the following letter and provide concise, helpful feedback. Focus on tone, clarity, and one key grammatical suggestion.
@@ -59,7 +58,6 @@ You are an expert writing assistant. Your task is to analyze the following lette
 <|assistant|>
 """
 
-    # Generate text
     outputs = pipe(
         prompt,
         max_new_tokens=150,
@@ -71,10 +69,48 @@ You are an expert writing assistant. Your task is to analyze the following lette
     
     # The output includes the full prompt, so we need to extract only the generated part.
     raw_response = outputs[0]['generated_text']
-    # The actual feedback starts after the <|assistant|> tag.
-    feedback = raw_response.split("<|assistant|>")[1].strip()
+    
+    try:
+        # Try to split the response as intended
+        feedback = raw_response.split("<|assistant|>")[1].strip()
+    except IndexError:
+        # If the split fails, it means the tag wasn't in the response.
+        # Fallback: Just use the raw response (without the prompt part)
+        # This is better than crashing.
+        print("Warning: Model response did not contain '<|assistant|>' tag. Using raw output.")
+        feedback = raw_response.replace(prompt, "").strip()
 
     return {"feedback": feedback}
+
+@app.post("/predict")
+async def predict_text(data: TextInput):
+    """
+    Receives the current text and predicts the next few words.
+    """
+    user_input = data.text
+    if not user_input or not user_input.strip():
+        return {"prediction": ""} # Return empty prediction if input is empty
+    # We don't need a complex chat prompt here. We just want the model to continue the thought.
+    # A simple prompt is best for completion.
+    prompt = user_input
+
+    # We want a very short, fast response.
+    outputs = pipe(
+        prompt,
+        max_new_tokens=10,  # Generate only a few words
+        do_sample=True,
+        temperature=0.5,    # A bit less creative to stay on topic
+        return_full_text=False, # Crucially, only return the *new* text
+    )
+    
+    prediction = outputs[0]['generated_text'].strip()
+
+    # The model might sometimes generate weird line breaks or incomplete thoughts.
+    # Let's clean it up a bit. We'll take the first coherent part.
+    # This splits the prediction by new lines and takes the first one.
+    clean_prediction = prediction.split('\n')[0]
+
+    return {"prediction": clean_prediction}
 
 # --- 5. Run the app ---
 if __name__ == "__main__":

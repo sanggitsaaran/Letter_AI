@@ -44,6 +44,32 @@ app.post("/analyze", async (req, res) => { // <-- ADD async
   }
 });
 
+app.post("/predict", async (req, res) => {
+  const userInput = req.body.text;
+
+  if (!userInput) {
+    // It's okay for predict to get empty text, just return empty
+    return res.json({ prediction: "" });
+  }
+
+  try {
+    // Call our Python API's /predict endpoint
+    const pythonApiResponse = await axios.post("http://127.0.0.1:8000/predict", {
+      text: userInput,
+    });
+
+    // Send the prediction from the Python API back to the frontend
+    res.json({ prediction: pythonApiResponse.data.prediction });
+
+  } catch (error) {
+    console.error("Error calling Python API for prediction:", error.message);
+    res.status(500).json({
+      error: "Failed to get prediction from AI service.",
+      details: error.message
+    });
+  }
+});
+
 // GET all letters (just ID and title)
 app.get("/letters", async (req, res) => {
   try {
