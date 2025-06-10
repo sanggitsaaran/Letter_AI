@@ -92,7 +92,7 @@ async def predict_text(data: TextInput):
         return {"prediction": ""} # Return empty prediction if input is empty
     # We don't need a complex chat prompt here. We just want the model to continue the thought.
     # A simple prompt is best for completion.
-    prompt = user_input
+    prompt = user_input[-500:]
 
     # We want a very short, fast response.
     outputs = pipe(
@@ -105,8 +105,6 @@ async def predict_text(data: TextInput):
     
     prediction = outputs[0]['generated_text'].strip()
 
-    # The model might sometimes generate weird line breaks or incomplete thoughts.
-    # Let's clean it up a bit. We'll take the first coherent part.
     # This splits the prediction by new lines and takes the first one.
     clean_prediction = prediction.split('\n')[0]
 
