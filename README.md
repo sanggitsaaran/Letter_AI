@@ -1,98 +1,158 @@
-# React + Vite
+# Letter AI ✍️
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Letter AI is an intelligent, real-time writing assistant designed to improve your writing by providing **instant feedback and predictive text suggestions**. This project moves beyond simple text editors by leveraging a local AI model to offer a proactive and dynamic writing experience. It's built with a modern, full-stack architecture featuring React, Node.js, and a Python-based AI service.
 
 
-# Letter_AI
 
-Letter_AI is a web application built with **React + TypeScript + Vite**. This project provides a scalable architecture for building AI-driven applications with modern frontend tools.
+## ✨ Key Features
 
-## ⚡️ Tech Stack
+-   **Real-time AI Feedback:** Get instant analysis on your writing's tone, clarity, and grammar as you type.
+-   **Predictive Text Autocompletion:** Smart, context-aware suggestions appear as you write. Press `Tab` to accept and speed up your workflow.
+-   **Multi-Document Management:** Create, load, and delete multiple letters, with your work saved automatically.
+-   **Persistent State:** The application remembers your last active letter, so you can pick up right where you left off.
+-   **Modern & Responsive UI:** A clean, intuitive interface built with React and TailwindCSS.
 
-- **React** with **TypeScript**
-- **Vite** for fast development builds
-- **TailwindCSS** (optional)
-- **ESLint** with recommended configurations
-- **Prettier** (optional)
-- **HMR (Hot Module Replacement)**
+## 🛠️ Tech Stack
+
+The application uses a modern microservice-style architecture to separate concerns and ensure scalability.
+
+-   **Frontend:**
+    -   **React** & **TypeScript**
+    -   **Vite** for a blazing-fast development experience
+    -   **TailwindCSS** for utility-first styling
+    -   **Socket.IO Client** for real-time communication
+
+-   **Backend (Node.js):**
+    -   **Express.js** for the API server
+    -   **Mongoose** for MongoDB object modeling
+    -   **Socket.IO** for real-time saving
+    -   **Axios** for inter-service communication
+    -   **Dotenv** for environment variable management
+
+-   **AI Service (Python):**
+    -   **FastAPI** for a high-performance AI inference server
+    -   **Hugging Face `transformers`** for model interaction
+    -   **PyTorch** as the deep learning framework
+    -   **`bitsandbytes`** for 4-bit model quantization (memory efficiency)
+
+-   **Database:**
+    -   **MongoDB Atlas**
 
 ## 🚀 Getting Started
 
-### Clone the repository
+Follow these instructions to get the project running on your local machine.
+
+### Prerequisites
+
+-   **Git**
+-   **Node.js** (v16 or later) and **npm**
+-   **Python** (v3.10 or later) and **pip**
+-   A **MongoDB Atlas** account and a connection string.
+
+### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/sanggitsaaran/Letter_AI.git
 cd Letter_AI
-````
-
-### Install dependencies
-
-```bash
-npm install
 ```
 
-### Run the development server
+### 2. Backend Setup
 
+First, set up the Node.js server and the Python AI service, which are both in the `backend` directory.
+
+```bash
+cd backend
+```
+
+**A. Node.js Server:**
+
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+
+2.  **Create an environment file:** Create a new file named `.env` in the `backend` directory. This will store your secret database connection string.
+
+    ```
+    # backend/.env
+    MONGO_URI=your_mongodb_connection_string_goes_here
+    ```
+
+**B. Python AI Service:**
+
+1.  **Create a Python virtual environment.** This is highly recommended to keep dependencies isolated.
+    ```bash
+    # On macOS/Linux
+    python3 -m venv venv
+    source venv/bin/activate
+
+    # On Windows
+    python -m venv venv
+    .\venv\Scripts\activate
+    ```
+
+2.  **Create a `requirements.txt` file** in the `backend` directory with the following content:
+    ```
+    # backend/requirements.txt
+    fastapi
+    uvicorn[standard]
+    pydantic
+    python-multipart
+    torch
+    transformers
+    accelerate
+    bitsandbytes
+    ```
+
+3.  **Install Python dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### 3. Frontend Setup
+
+Now, set up the React frontend.
+
+1.  **Navigate to the root directory:**
+    ```bash
+    cd .. 
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+
+### 4. Running the Application
+
+You will need to have **three separate terminals** open to run the entire application.
+
+**➡️ Terminal 1: Start the Python AI Service**
+*(Make sure your virtual environment is activated)*
+```bash
+cd backend
+python ai_api.py
+```
+Wait until you see the message "Model loaded successfully!"
+
+**➡️ Terminal 2: Start the Node.js Backend Server**
+```bash
+cd backend
+node server.js
+```
+Wait until you see "Connected to MongoDB 🚀" and "Server running on port 5000".
+
+**➡️ Terminal 3: Start the React Frontend**
+*(From the root `Letter_AI` directory)*
 ```bash
 npm run dev
 ```
 
-### Build for production
-
-```bash
-npm run build
-```
-
-## 🛠️ ESLint Configuration
-
-The ESLint config uses `@typescript-eslint` recommended settings. If you want stricter rules or type-aware linting, update `eslint.config.js` like:
-
-```js
-export default tseslint.config({
-  extends: [
-    ...tseslint.configs.recommendedTypeChecked,
-    ...tseslint.configs.strictTypeChecked,
-  ],
-  languageOptions: {
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
-
-For React-specific lint rules:
-
-```js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  plugins: {
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+Your application is now running! Open your browser and go to **[http://localhost:5173](http://localhost:5173)**.
 
 ## 👨‍💻 Author
 
 **Sanggit Saaran K C S**
 
-* 🔗 [LinkedIn](https://www.linkedin.com/in/sanggit-saaran-k-c-s/)
-* 💻 [GitHub](https://github.com/sanggitsaaran)
-
----
+-   🔗 [LinkedIn](https://www.linkedin.com/in/sanggit-saaran-k-c-s/)
+-   💻 [GitHub](https://github.com/sanggitsaaran)
