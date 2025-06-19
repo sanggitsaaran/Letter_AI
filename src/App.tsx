@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { io } from "socket.io-client";
+import { PlusIcon, TrashIcon, SunIcon, MoonIcon } from "@heroicons/react/24/outline";
+import { Switch } from '@headlessui/react';
 
 interface Letter {
   _id: string;
@@ -11,12 +13,46 @@ interface Letter {
 // The socket connection needs the full URL, as it's not a standard HTTP request
 const socket = io("http://localhost:5000");
 const LOCAL_STORAGE_KEY = "letter-ai-active-id";
+const LOCAL_STORAGE_KEY_THEME = "letter-ai-theme";
+
+// --- Dark Mode Toggle Component ---
+function ThemeToggle() {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem(LOCAL_STORAGE_KEY_THEME);
+    return savedTheme === 'dark';
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem(LOCAL_STORAGE_KEY_THEME, 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem(LOCAL_STORAGE_KEY_THEME, 'light');
+    }
+  }, [isDarkMode]);
+  
+  return (
+    <Switch
+      checked={isDarkMode}
+      onChange={setIsDarkMode}
+      className={`${
+        isDarkMode ? 'bg-indigo-600' : 'bg-gray-200'
+      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors`}
+    >
+      <span className="sr-only">Toggle theme</span>
+      <span
+        className={`${
+          isDarkMode ? 'translate-x-6' : 'translate-x-1'
+        } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+      />
+    </Switch>
+  );
+}
 
 export default function App() {
   const [letters, setLetters] = useState<Letter[]>([]);
-  const [activeLetterId, setActiveLetterId] = useState<string | null>(() => {
-    return localStorage.getItem(LOCAL_STORAGE_KEY);
-  });
+  const [activeLetterId, setActiveLetterId] = useState<string | null>(() => localStorage.getItem(LOCAL_STORAGE_KEY));
   const [text, setText] = useState("");
   const [feedback, setFeedback] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -183,74 +219,72 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      <div className="w-1/4 bg-white border-r border-gray-200 p-4 flex flex-col">
-        <h1 className="text-xl font-bold text-blue-600 mb-4">My Letters</h1>
+    <div className="flex h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans transition-colors duration-300">
+      {/* Sidebar */}
+      <div className="w-1/4 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 flex flex-col">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Letter AI</h1>
+          <ThemeToggle />
+        </div>
         <button
           onClick={handleCreateNewLetter}
-          className="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 mb-4"
+          className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 mb-4 transition-all duration-200 font-semibold shadow-sm"
         >
-          + New Letter
+          <PlusIcon className="h-5 w-5" />
+          New Letter
         </button>
-        <div className="flex-grow overflow-y-auto">
+        <div className="flex-grow overflow-y-auto space-y-1 pr-1">
           {letters.map((letter) => (
             <div
               key={letter._id}
               onClick={() => setActiveLetterId(letter._id)}
-              className={`p-2 my-1 rounded-md cursor-pointer flex justify-between items-center ${
-                activeLetterId === letter._id ? "bg-blue-100" : "hover:bg-gray-50"
+              className={`p-3 rounded-lg cursor-pointer group flex justify-between items-center transition-colors duration-150 ${
+                activeLetterId === letter._id 
+                ? "bg-indigo-100 dark:bg-indigo-900/50" 
+                : "hover:bg-gray-100 dark:hover:bg-gray-700/50"
               }`}
             >
               <span className="font-medium truncate">{letter.title}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteLetter(letter._id);
-                }}
-                className="text-red-400 hover:text-red-600 text-xs font-bold"
+              <button 
+                onClick={(e) => { e.stopPropagation(); handleDeleteLetter(letter._id); }}
+                className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                DELETE
+                <TrashIcon className="h-5 w-5" />
               </button>
             </div>
           ))}
         </div>
       </div>
 
-      <main className="w-3/4 p-8 flex flex-col">
+      <main className="w-3/4 p-8 flex flex-col gap-6">
         {activeLetterId ? (
           <>
-            <div className="relative w-full flex-grow">
-              <div
-                className="absolute inset-0 p-4 font-mono text-lg text-gray-400 pointer-events-none whitespace-pre-wrap break-words"
-              >
-                {text}
-                <span className="opacity-75">{suggestion}</span>
+            <div className="relative w-full flex-grow rounded-xl shadow-lg">
+              <div className="absolute inset-0 p-5 font-mono text-lg text-gray-400 pointer-events-none whitespace-pre-wrap break-words">
+                {text}<span className="opacity-60">{suggestion}</span>
               </div>
               <textarea
                 ref={textAreaRef}
-                className="absolute inset-0 w-full h-full p-4 bg-transparent border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-lg text-gray-800 caret-black"
+                className="absolute inset-0 w-full h-full p-5 bg-white/80 dark:bg-gray-800/80 border border-transparent focus:border-indigo-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-mono text-lg text-gray-900 dark:text-gray-100 caret-indigo-500 transition-all duration-200"
                 placeholder="Start writing..."
                 value={text}
                 onChange={handleTyping}
                 onKeyDown={handleKeyDown}
               />
             </div>
-
-            <div className="mt-4 p-4 h-48 bg-white rounded-md border border-gray-200 overflow-y-auto">
+            
+            <div className="p-5 h-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-y-auto">
+              <h3 className="font-bold text-gray-500 dark:text-gray-400 mb-2">AI Assistant</h3>
               {isLoading ? (
                 <p className="text-lg text-gray-500">AI is thinking...</p>
               ) : (
-                <p className="text-lg text-green-700 whitespace-pre-wrap">
-                  {feedback}
-                </p>
+                <p className="text-lg text-green-700 dark:text-green-400 whitespace-pre-wrap">{feedback}</p>
               )}
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xl text-gray-500">
-              Select a letter or create a new one to begin.
-            </p>
+          <div className="flex items-center justify-center h-full rounded-xl bg-white dark:bg-gray-800">
+            <p className="text-xl text-gray-500">Select a letter or create a new one to begin.</p>
           </div>
         )}
       </main>

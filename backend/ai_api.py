@@ -97,9 +97,9 @@ async def predict_text(data: TextInput):
     # We want a very short, fast response.
     outputs = pipe(
         prompt,
-        max_new_tokens=10,  # Generate only a few words
+        max_new_tokens=5,  # Generate only a few words
         do_sample=True,
-        temperature=0.5,    # A bit less creative to stay on topic
+        temperature=0.6,    # A bit less creative to stay on topic
         return_full_text=False, # Crucially, only return the *new* text
     )
     
