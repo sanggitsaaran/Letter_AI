@@ -223,7 +223,7 @@ export default function App() {
       {/* Sidebar */}
       <div className="w-1/4 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 flex flex-col">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Letter AI</h1>
+          <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">LetterLift</h1>
           <ThemeToggle />
         </div>
         <button
