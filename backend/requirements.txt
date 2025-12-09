@@ -1,0 +1,14 @@
+# Letter AI - Python AI Service Dependencies
+# Install with: pip install -r requirements.txt
+
+# FastAPI Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+python-multipart>=0.0.6
+
+# Machine Learning & AI
+torch>=2.1.0
+transformers>=4.36.0
+accelerate>=0.25.0
+bitsandbytes>=0.41.0
