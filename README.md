@@ -27,13 +27,6 @@
   <img src="https://img.shields.io/badge/TailwindCSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="TailwindCSS">
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/github/license/sanggitsaaran/Letter_AI?style=flat-square" alt="License">
-  <img src="https://img.shields.io/github/stars/sanggitsaaran/Letter_AI?style=flat-square" alt="Stars">
-  <img src="https://img.shields.io/github/forks/sanggitsaaran/Letter_AI?style=flat-square" alt="Forks">
-  <img src="https://img.shields.io/github/issues/sanggitsaaran/Letter_AI?style=flat-square" alt="Issues">
-</p>
-
 ---
 
 ## 📋 Overview
@@ -55,15 +48,6 @@ Whether you're drafting professional correspondence, personal letters, or formal
 | 🌗 **Dark/Light Mode** | Toggle between themes for comfortable writing |
 | 🔄 **Real-time Sync** | Socket.IO powered live updates and saving |
 | 📱 **Responsive Design** | Beautiful UI that works on all screen sizes |
-
----
-
-## 🎯 Demo
-
-<!-- Add a GIF or screenshot of your application here -->
-<!-- ![LetterLift Demo](./demo.gif) -->
-
-> **Live Demo:** Coming Soon
 
 ---
 
